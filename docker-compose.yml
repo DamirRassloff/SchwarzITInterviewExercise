@@ -1,7 +1,12 @@
 services:
   api:
-    build:
-      context: ./api
-      dockerfile: Dockerfile
+    build: ./api
     ports:
       - "8000:8000"
+
+  dashboard:
+    build: ./dashboard
+    ports:
+      - "8050:8050"
+    depends_on:
+      - api
