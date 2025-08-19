@@ -35,6 +35,7 @@ app.layout = html.Div([
     ], style={"marginBottom": "20px"}),
     
     dcc.Graph(id="sales-by-category"),
+    dcc.Graph(id="sales-over-time"),
 ])
 
 # Reset-Callback
@@ -51,11 +52,12 @@ def reset_dates(n_clicks):
 # Automatisches Update bei Änderung
 @app.callback(
     Output("sales-by-category", "figure"),
+    Output("sales-over-time", "figure"),
     Input("date-range", "start_date"),
     Input("date-range", "end_date"),
     Input("top-n", "value"),
 )
-def update_graph(start_date, end_date, top_n):
+def update_graphs(start_date, end_date, top_n):
     params = {}
     if start_date: params["start"] = start_date
     if end_date:   params["end"] = end_date
@@ -63,34 +65,47 @@ def update_graph(start_date, end_date, top_n):
     try:
         resp = requests.get(f"{API_BASE}/metrics", params=params, timeout=20)
         resp.raise_for_status()
-        rows = resp.json().get("sales_by_category", [])
+        data = resp.json()
+        rows_cat = data.get("sales_by_category", [])
+        rows_time = data.get("sales_over_time", [])
     except Exception:
-        rows = []
+        rows_cat, rows_time = [], []
 
-    df = pd.DataFrame(rows)
-
-    if df.empty:
-        fig = px.bar(title="Verkäufe pro Kategorie")
-        fig.add_annotation(
+    # --- Verkäufe pro Kategorie ---
+    df_cat = pd.DataFrame(rows_cat)
+    if df_cat.empty:
+        fig_cat = px.bar(title="Verkäufe pro Kategorie")
+        fig_cat.add_annotation(
             text="Keine Daten vorhanden",
             xref="paper", yref="paper", x=0.5, y=0.5,
             showarrow=False, font=dict(size=16)
         )
-        fig.update_xaxes(visible=False)
-        fig.update_yaxes(visible=False)
-        return fig
+        fig_cat.update_xaxes(visible=False)
+        fig_cat.update_yaxes(visible=False)
+    else:
+        df_cat = df_cat.sort_values("sales", ascending=False)
+        if top_n and top_n > 0:
+            df_cat = df_cat.head(top_n)
+        fig_cat = px.bar(df_cat, x="Kategorie", y="sales", title="Verkäufe pro Kategorie")
 
-    # Sortieren nach Umsatz
-    df = df.sort_values("sales", ascending=False)
+    # --- Verkäufe über Zeit ---
+    df_time = pd.DataFrame(rows_time)
+    if df_time.empty:
+        fig_time = px.line(title="Verkäufe über Zeit")
+        fig_time.add_annotation(
+            text="Keine Daten vorhanden",
+            xref="paper", yref="paper", x=0.5, y=0.5,
+            showarrow=False, font=dict(size=16)
+        )
+        fig_time.update_xaxes(visible=False)
+        fig_time.update_yaxes(visible=False)
+    else:
+        fig_time = px.line(df_time, x="Verkaufsdatum", y="sales", title="Verkäufe über Zeit")
 
-    # Top N anwenden (0 = Alle)
-    if top_n and top_n > 0:
-        df = df.head(top_n)
-
-    fig = px.bar(df, x="Kategorie", y="sales", title="Verkäufe pro Kategorie")
-    return fig
+    return fig_cat, fig_time
 
 
 if __name__ == "__main__":
     app.run_server(debug=True, host="0.0.0.0", port=8050)
+
 

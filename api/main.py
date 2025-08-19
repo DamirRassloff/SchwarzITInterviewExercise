@@ -71,17 +71,25 @@ def metrics(
     if end:
         data = data[data[DATE_COL] <= pd.to_datetime(end, errors="coerce")]
 
-    # Verkäufe pro Kategorie (Summe)
-    # Casten auf numeric (falls die Spalte als Text importiert wurde)
+    # Verkäufe casten
     sales_series = pd.to_numeric(data[SALES_COL], errors="coerce").fillna(0)
     data = data.assign(_sales=sales_series)
 
+    # Verkäufe pro Kategorie
     by_cat = (
         data.groupby(CATEGORY_COL)["_sales"]
         .sum()
         .reset_index()
         .sort_values("_sales", ascending=False)
         .head(top)
+    )
+
+    # Verkäufe über Zeit (pro Tag)
+    by_date = (
+        data.groupby(DATE_COL)["_sales"]
+        .sum()
+        .reset_index()
+        .sort_values(DATE_COL)
     )
 
     return {
@@ -91,5 +99,8 @@ def metrics(
             {CATEGORY_COL: str(row[CATEGORY_COL]), "sales": float(row["_sales"])}
             for _, row in by_cat.iterrows()
         ],
+        "sales_over_time": [
+            {DATE_COL: str(row[DATE_COL].date()), "sales": float(row["_sales"])}
+            for _, row in by_date.iterrows()
+        ],
     }
-
