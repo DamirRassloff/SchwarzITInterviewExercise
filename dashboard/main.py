@@ -45,6 +45,7 @@ app.layout = html.Div([
     dcc.Graph(id="sales-by-store-pie"),
     dcc.Graph(id="sales-by-article"),
     dcc.Graph(id="sales-by-article-pie"),
+    dcc.Graph(id="predicted-over-time"),
 ])
 
 # Reset-Callback
@@ -68,6 +69,7 @@ def reset_dates(n_clicks):
     Output("sales-by-article", "figure"),
     Output("sales-by-article-pie", "figure"),
     Output("kpi-bar", "children"),
+    Output("predicted-over-time", "figure"), 
     Input("date-range", "start_date"),
     Input("date-range", "end_date"),
     Input("top-n", "value"),
@@ -87,6 +89,7 @@ def update_graphs(start_date, end_date, top_n):
         rows_time  = data.get("sales_over_time", [])
         rows_store = data.get("sales_by_store", [])
         rows_article = data.get("sales_by_article", [])
+        rows_pred = data.get("predicted_over_time", [])
     except Exception:
         data = {}
         rows_cat, rows_time, rows_store = [], [], []
@@ -200,9 +203,26 @@ def update_graphs(start_date, end_date, top_n):
         fig_article_pie.update_traces(textinfo="none",
                               hovertemplate="%{label}<br>%{percent:.2%} (%{value:.0f})<extra></extra>")
         fig_article_pie.update_layout(showlegend=False)
+
+    # --- Vorhergesagter Verkaufswert über Zeit ---
+    df_pred = pd.DataFrame(rows_pred)
+    if df_pred.empty:
+        fig_pred = px.line(title="Vorhergesagter Verkaufswert über Zeit")
+        fig_pred.add_annotation(
+            text="Keine Daten vorhanden",
+            xref="paper", yref="paper", x=0.5, y=0.5,
+            showarrow=False, font=dict(size=16)
+        )
+        fig_pred.update_xaxes(visible=False)
+        fig_pred.update_yaxes(visible=False)
+    else:
+        fig_pred = px.line(
+            df_pred, x="Verkaufsdatum", y="predicted",
+            title="Vorhergesagter Verkaufswert über Zeit"
+        )
     
 
-    return fig_cat, fig_cat_pie, fig_time, fig_store, fig_store_pie, fig_article, fig_article_pie, kpis
+    return fig_cat, fig_cat_pie, fig_time, fig_store, fig_store_pie, fig_article, fig_article_pie, kpis, fig_pred
 
 
 if __name__ == "__main__":

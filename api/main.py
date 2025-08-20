@@ -17,6 +17,7 @@ CATEGORY_COL = "Kategorie"
 SALES_COL = "Verkauf in Stück"  # falls CSV falsch decodiert ist: "Verkauf in StÃ¼ck"
 STORE_COL = "Filialnummer"
 ARTICLE_COL = "Artikelname"   # für distinct_articles
+PRED_COL = "Vorhergesagter Verkaufswert"
 
 # Minimaler Fix, falls das "ü" zerschossen ist
 if SALES_COL not in df.columns and "Verkauf in StÃ¼ck" in df.columns:
@@ -126,6 +127,16 @@ def metrics(
         else None
     )
 
+    # Vorhergesagter Verkaufswert über Zeit (pro Tag)
+    pred_series = pd.to_numeric(data.get(PRED_COL, 0), errors="coerce").fillna(0)
+    by_date_pred = (
+        data.assign(_pred=pred_series)
+            .groupby(DATE_COL)["_pred"]
+            .sum()
+            .reset_index()
+            .sort_values(DATE_COL)
+    )
+
     return {
         "total_rows": int(len(data)),
         "total_sales": total_sales,
@@ -146,5 +157,9 @@ def metrics(
         "sales_by_article": [
             {ARTICLE_COL: str(row[ARTICLE_COL]), "sales": float(row["_sales"])}
             for _, row in by_article.iterrows()
+        ],
+        "predicted_over_time": [
+            {DATE_COL: str(row[DATE_COL].date()), "predicted": float(row["_pred"])}
+            for _, row in by_date_pred.iterrows()
         ],
     }
