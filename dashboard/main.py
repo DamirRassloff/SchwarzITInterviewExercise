@@ -36,6 +36,7 @@ app.layout = html.Div([
     
     dcc.Graph(id="sales-by-category"),
     dcc.Graph(id="sales-over-time"),
+    dcc.Graph(id="sales-by-store"),
 ])
 
 # Reset-Callback
@@ -53,6 +54,7 @@ def reset_dates(n_clicks):
 @app.callback(
     Output("sales-by-category", "figure"),
     Output("sales-over-time", "figure"),
+    Output("sales-by-store", "figure"),
     Input("date-range", "start_date"),
     Input("date-range", "end_date"),
     Input("top-n", "value"),
@@ -68,6 +70,7 @@ def update_graphs(start_date, end_date, top_n):
         data = resp.json()
         rows_cat = data.get("sales_by_category", [])
         rows_time = data.get("sales_over_time", [])
+        rows_store = data.get("sales_by_store", []) 
     except Exception:
         rows_cat, rows_time = [], []
 
@@ -102,7 +105,20 @@ def update_graphs(start_date, end_date, top_n):
     else:
         fig_time = px.line(df_time, x="Verkaufsdatum", y="sales", title="Verkäufe über Zeit")
 
-    return fig_cat, fig_time
+    # --- Verkäufe pro Filiale ---
+    df_store = pd.DataFrame(rows_store)
+    if df_store.empty:
+        fig_store = px.bar(title="Verkäufe pro Filiale")
+        fig_store.add_annotation(text="Keine Daten vorhanden", xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False, font=dict(size=16))
+        fig_store.update_xaxes(visible=False); fig_store.update_yaxes(visible=False)
+    else:
+        # Top-N analog anwenden
+        df_store = df_store.sort_values("sales", ascending=False)
+        if top_n and top_n > 0:
+            df_store = df_store.head(top_n)
+        fig_store = px.bar(df_store, x="Filialnummer", y="sales", title="Verkäufe pro Filiale")
+
+    return fig_cat, fig_time, fig_store
 
 
 if __name__ == "__main__":

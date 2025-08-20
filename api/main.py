@@ -15,6 +15,7 @@ except UnicodeDecodeError:
 DATE_COL = "Verkaufsdatum"
 CATEGORY_COL = "Kategorie"
 SALES_COL = "Verkauf in Stück"  # falls CSV falsch decodiert ist: "Verkauf in StÃ¼ck"
+STORE_COL = "Filialnummer"
 
 # Minimaler Fix, falls das "ü" zerschossen ist
 if SALES_COL not in df.columns and "Verkauf in StÃ¼ck" in df.columns:
@@ -92,6 +93,15 @@ def metrics(
         .sort_values(DATE_COL)
     )
 
+    # Verkäufe pro Filiale
+    by_store = (
+        data.groupby(STORE_COL)["_sales"]
+        .sum()
+        .reset_index()
+        .sort_values("_sales", ascending=False)
+        .head(top)
+    )
+
     return {
         "total_rows": int(len(data)),
         "total_sales": float(sales_series.sum()),
@@ -102,5 +112,9 @@ def metrics(
         "sales_over_time": [
             {DATE_COL: str(row[DATE_COL].date()), "sales": float(row["_sales"])}
             for _, row in by_date.iterrows()
+        ],
+        "sales_by_store": [
+            {STORE_COL: str(row[STORE_COL]), "sales": float(row["_sales"])}
+            for _, row in by_store.iterrows()
         ],
     }
