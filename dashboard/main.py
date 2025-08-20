@@ -12,7 +12,7 @@ server = app.server
 app.layout = html.Div([
     html.H1("Sales Dashboard (Schwarz IT Exercise)"),
     
-    # Filterbereich
+    # --- Filter section ---
     html.Div([
         dcc.DatePickerRange(id="date-range"),
         html.Button("Reset Date Filter", id="reset-btn", style={"marginLeft": "10px"}),
@@ -28,16 +28,16 @@ app.layout = html.Div([
                 {"label": "Top 10", "value": 10},
                 {"label": "Alle", "value": 0},
             ],
-            value=5,  # Default
+            value=5,  # Default selection
             clearable=False,
             style={"width": "200px"}
         ),
     ], style={"marginBottom": "20px"}),
 
-    # KPI-Leiste (NEU)
+    # --- KPI bar ---
     html.Div(id="kpi-bar", style={"display": "flex", "gap": "16px", "marginBottom": "16px"}),
 
-    # Charts
+    # --- Graphs ---
     dcc.Graph(id="sales-by-category"),
     dcc.Graph(id="sales-by-category-pie"),
     dcc.Graph(id="sales-over-time"),
@@ -48,7 +48,7 @@ app.layout = html.Div([
     dcc.Graph(id="predicted-over-time"),
 ])
 
-# Reset-Callback
+# --- Reset callback for date filter ---
 @app.callback(
     Output("date-range", "start_date"),
     Output("date-range", "end_date"),
@@ -59,7 +59,7 @@ def reset_dates(n_clicks):
     return None, None
 
 
-# Automatisches Update bei Änderung
+# --- Main update callback (triggered by filters) ---
 @app.callback(
     Output("sales-by-category", "figure"),
     Output("sales-by-category-pie", "figure"),
@@ -75,12 +75,14 @@ def reset_dates(n_clicks):
     Input("top-n", "value"),
 )
 def update_graphs(start_date, end_date, top_n):
+    # --- Prepare request params ---
     params = {}
     if start_date: params["start"] = start_date
     if end_date:   params["end"] = end_date
     if top_n is not None:
         params["top"] = top_n
 
+    # --- Fetch data from API ---
     try:
         resp = requests.get(f"{API_BASE}/metrics", params=params, timeout=20)
         resp.raise_for_status()
@@ -94,12 +96,13 @@ def update_graphs(start_date, end_date, top_n):
         data = {}
         rows_cat, rows_time, rows_store = [], [], []
 
-    # ---- KPI-Bar (NEU) ----
+    # --- KPI bar ---
     total_sales = data.get("total_sales", 0)
     total_rows = data.get("total_rows", 0)
     avg_per_day = data.get("avg_sales_per_day", 0)
     distinct_articles = data.get("distinct_articles", None)
 
+    # Helper for KPI cards
     def kpi_card(label, value):
         return html.Div([
             html.Div(label, style={"fontSize": "12px", "color": "#555"}),
@@ -110,122 +113,103 @@ def update_graphs(start_date, end_date, top_n):
                   "background": "#fafafa",
                   "minWidth": "180px"})
 
+    # Add KPI values
     kpis = [
         kpi_card("Gesamtverkäufe (Stück)", f"{int(total_sales):,}".replace(",", ".")),
         kpi_card("Datensätze im Zeitraum", f"{int(total_rows):,}".replace(",", ".")),
         kpi_card("Ø Verkäufe pro Tag", f"{avg_per_day:.2f}"),
     ]
- 
-    # Nur anhängen, wenn vorhanden
     if distinct_articles is not None:
         kpis.append(kpi_card("Anzahl Artikel", f"{int(distinct_articles):,}".replace(",", ".")))
 
-    # --- Verkäufe pro Kategorie ---
+    # --- Sales by category ---
     df_cat = pd.DataFrame(rows_cat)
     if df_cat.empty:
         fig_cat = px.bar(title="Verkäufe pro Kategorie")
-        fig_cat.add_annotation(
-            text="Keine Daten vorhanden",
-            xref="paper", yref="paper", x=0.5, y=0.5,
-            showarrow=False, font=dict(size=16)
-        )
-        fig_cat.update_xaxes(visible=False)
-        fig_cat.update_yaxes(visible=False)
+        fig_cat.add_annotation(text="Keine Daten vorhanden",
+                               xref="paper", yref="paper", x=0.5, y=0.5,
+                               showarrow=False, font=dict(size=16))
+        fig_cat.update_xaxes(visible=False); fig_cat.update_yaxes(visible=False)
 
         fig_cat_pie = px.pie(title="Verkäufe pro Kategorie (Anteile)")
-        fig_cat_pie.add_annotation(
-            text="Keine Daten vorhanden", 
-            xref="paper", yref="paper", 
-            x=0.5, y=0.5, 
-            showarrow=False, font=dict(size=16))
+        fig_cat_pie.add_annotation(text="Keine Daten vorhanden",
+                                   xref="paper", yref="paper", x=0.5, y=0.5,
+                                   showarrow=False, font=dict(size=16))
     else:
         df_cat = df_cat.sort_values("sales", ascending=False)
         fig_cat = px.bar(df_cat, x="Kategorie", y="sales", title="Verkäufe pro Kategorie")
-        fig_cat_pie = px.pie(df_cat, names="Kategorie", values="sales", 
-                        title="Verkäufe pro Kategorie (Anteile)")
+        fig_cat_pie = px.pie(df_cat, names="Kategorie", values="sales",
+                             title="Verkäufe pro Kategorie (Anteile)")
 
-    # --- Verkäufe über Zeit ---
+    # --- Sales over time ---
     df_time = pd.DataFrame(rows_time)
     if df_time.empty:
         fig_time = px.line(title="Verkäufe über Zeit")
-        fig_time.add_annotation(
-            text="Keine Daten vorhanden",
-            xref="paper", yref="paper", x=0.5, y=0.5,
-            showarrow=False, font=dict(size=16)
-        )
-        fig_time.update_xaxes(visible=False)
-        fig_time.update_yaxes(visible=False)
+        fig_time.add_annotation(text="Keine Daten vorhanden",
+                                xref="paper", yref="paper", x=0.5, y=0.5,
+                                showarrow=False, font=dict(size=16))
+        fig_time.update_xaxes(visible=False); fig_time.update_yaxes(visible=False)
     else:
         fig_time = px.line(df_time, x="Verkaufsdatum", y="sales", title="Verkäufe über Zeit")
 
-    # --- Verkäufe pro Filiale ---
+    # --- Sales by store ---
     df_store = pd.DataFrame(rows_store)
     if df_store.empty:
         fig_store = px.bar(title="Verkäufe pro Filiale")
-        fig_store.add_annotation(text="Keine Daten vorhanden", xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False, font=dict(size=16))
+        fig_store.add_annotation(text="Keine Daten vorhanden",
+                                 xref="paper", yref="paper", x=0.5, y=0.5,
+                                 showarrow=False, font=dict(size=16))
         fig_store.update_xaxes(visible=False); fig_store.update_yaxes(visible=False)
 
         fig_store_pie = px.pie(title="Verkäufe pro Filiale (Anteile)")
-        fig_store_pie.add_annotation(text="Keine Daten vorhanden", xref="paper", yref="paper", 
-                                     x=0.5, y=0.5, showarrow=False, font=dict(size=16))
+        fig_store_pie.add_annotation(text="Keine Daten vorhanden",
+                                     xref="paper", yref="paper", x=0.5, y=0.5,
+                                     showarrow=False, font=dict(size=16))
     else:
-        # Top-N analog anwenden
         df_store = df_store.sort_values("sales", ascending=False)
         fig_store = px.bar(df_store, x="Filialnummer", y="sales", title="Verkäufe pro Filiale")
-        fig_store_pie = px.pie(df_store, names="Filialnummer", values="sales", 
+        fig_store_pie = px.pie(df_store, names="Filialnummer", values="sales",
                                title="Verkäufe pro Filiale (Anteile)")
-        
-    # --- Verkäufe pro Artikel ---
+
+    # --- Sales by article ---
     df_article = pd.DataFrame(rows_article)
     if df_article.empty:
         fig_article = px.bar(title="Verkäufe pro Artikel")
-        fig_article.add_annotation(
-            text="Keine Daten vorhanden", xref="paper", yref="paper",
-            x=0.5, y=0.5, showarrow=False, font=dict(size=16)
-        )
-        fig_article.update_xaxes(visible=False)
-        fig_article.update_yaxes(visible=False)
+        fig_article.add_annotation(text="Keine Daten vorhanden",
+                                   xref="paper", yref="paper", x=0.5, y=0.5,
+                                   showarrow=False, font=dict(size=16))
+        fig_article.update_xaxes(visible=False); fig_article.update_yaxes(visible=False)
 
         fig_article_pie = px.pie(title="Verkäufe pro Artikel")
-        fig_article_pie.add_annotation(
-            text="Keine Daten vorhanden", xref="paper", yref="paper",
-            x=0.5, y=0.5, showarrow=False, font=dict(size=16)
-        )
+        fig_article_pie.add_annotation(text="Keine Daten vorhanden",
+                                       xref="paper", yref="paper", x=0.5, y=0.5,
+                                       showarrow=False, font=dict(size=16))
     else:
         df_article = df_article.sort_values("sales", ascending=False)
-
-        fig_article = px.bar(
-            df_article, x="Artikelname", y="sales", title="Verkäufe pro Artikel"
-        )
-        fig_article_pie = px.pie(
-            df_article, names="Artikelname", values="sales", title="Verkäufe pro Artikel (Anteil)"
-        )
+        fig_article = px.bar(df_article, x="Artikelname", y="sales", title="Verkäufe pro Artikel")
+        fig_article_pie = px.pie(df_article, names="Artikelname", values="sales",
+                                 title="Verkäufe pro Artikel (Anteile)")
         fig_article_pie.update_traces(textinfo="none",
-                              hovertemplate="%{label}<br>%{percent:.2%} (%{value:.0f})<extra></extra>")
+                        hovertemplate="%{label}<br>%{percent:.2%} (%{value:.0f})<extra></extra>")
         fig_article_pie.update_layout(showlegend=False)
 
-    # --- Vorhergesagter Verkaufswert über Zeit ---
+    # --- Predicted sales over time ---
     df_pred = pd.DataFrame(rows_pred)
     if df_pred.empty:
         fig_pred = px.line(title="Vorhergesagter Verkaufswert über Zeit")
-        fig_pred.add_annotation(
-            text="Keine Daten vorhanden",
-            xref="paper", yref="paper", x=0.5, y=0.5,
-            showarrow=False, font=dict(size=16)
-        )
-        fig_pred.update_xaxes(visible=False)
-        fig_pred.update_yaxes(visible=False)
+        fig_pred.add_annotation(text="Keine Daten vorhanden",
+                                xref="paper", yref="paper", x=0.5, y=0.5,
+                                showarrow=False, font=dict(size=16))
+        fig_pred.update_xaxes(visible=False); fig_pred.update_yaxes(visible=False)
     else:
-        fig_pred = px.line(
-            df_pred, x="Verkaufsdatum", y="predicted",
-            title="Vorhergesagter Verkaufswert über Zeit"
-        )
-    
+        fig_pred = px.line(df_pred, x="Verkaufsdatum", y="predicted",
+                           title="Vorhergesagter Verkaufswert über Zeit")
 
     return fig_cat, fig_cat_pie, fig_time, fig_store, fig_store_pie, fig_article, fig_article_pie, kpis, fig_pred
 
 
 if __name__ == "__main__":
     app.run_server(debug=True, host="0.0.0.0", port=8050)
+
 
 
