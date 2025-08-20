@@ -19,7 +19,7 @@ app.layout = html.Div([
         
         html.Br(), html.Br(),
         
-        html.Label("Anzahl Kategorien:"),
+        html.Label("Anzahl Kategorien, Filialen & Artikel:"),
         dcc.Dropdown(
             id="top-n",
             options=[
@@ -43,6 +43,8 @@ app.layout = html.Div([
     dcc.Graph(id="sales-over-time"),
     dcc.Graph(id="sales-by-store"),
     dcc.Graph(id="sales-by-store-pie"),
+    dcc.Graph(id="sales-by-article"),
+    dcc.Graph(id="sales-by-article-pie"),
 ])
 
 # Reset-Callback
@@ -63,6 +65,8 @@ def reset_dates(n_clicks):
     Output("sales-over-time", "figure"),
     Output("sales-by-store", "figure"),
     Output("sales-by-store-pie", "figure"),
+    Output("sales-by-article", "figure"),
+    Output("sales-by-article-pie", "figure"),
     Output("kpi-bar", "children"),
     Input("date-range", "start_date"),
     Input("date-range", "end_date"),
@@ -72,6 +76,8 @@ def update_graphs(start_date, end_date, top_n):
     params = {}
     if start_date: params["start"] = start_date
     if end_date:   params["end"] = end_date
+    if top_n is not None:
+        params["top"] = top_n
 
     try:
         resp = requests.get(f"{API_BASE}/metrics", params=params, timeout=20)
@@ -80,6 +86,7 @@ def update_graphs(start_date, end_date, top_n):
         rows_cat   = data.get("sales_by_category", [])
         rows_time  = data.get("sales_over_time", [])
         rows_store = data.get("sales_by_store", [])
+        rows_article = data.get("sales_by_article", [])
     except Exception:
         data = {}
         rows_cat, rows_time, rows_store = [], [], []
@@ -104,8 +111,11 @@ def update_graphs(start_date, end_date, top_n):
         kpi_card("Gesamtverkäufe (Stück)", f"{int(total_sales):,}".replace(",", ".")),
         kpi_card("Datensätze im Zeitraum", f"{int(total_rows):,}".replace(",", ".")),
         kpi_card("Ø Verkäufe pro Tag", f"{avg_per_day:.2f}"),
-        kpi_card("Anzahl Artikel", f"{int(distinct_articles):,}".replace(",", ".")),
     ]
+ 
+    # Nur anhängen, wenn vorhanden
+    if distinct_articles is not None:
+        kpis.append(kpi_card("Anzahl Artikel", f"{int(distinct_articles):,}".replace(",", ".")))
 
     # --- Verkäufe pro Kategorie ---
     df_cat = pd.DataFrame(rows_cat)
@@ -127,8 +137,6 @@ def update_graphs(start_date, end_date, top_n):
             showarrow=False, font=dict(size=16))
     else:
         df_cat = df_cat.sort_values("sales", ascending=False)
-        if top_n and top_n > 0:
-            df_cat = df_cat.head(top_n)
         fig_cat = px.bar(df_cat, x="Kategorie", y="sales", title="Verkäufe pro Kategorie")
         fig_cat_pie = px.pie(df_cat, names="Kategorie", values="sales", 
                         title="Verkäufe pro Kategorie (Anteile)")
@@ -160,13 +168,41 @@ def update_graphs(start_date, end_date, top_n):
     else:
         # Top-N analog anwenden
         df_store = df_store.sort_values("sales", ascending=False)
-        if top_n and top_n > 0:
-            df_store = df_store.head(top_n)
         fig_store = px.bar(df_store, x="Filialnummer", y="sales", title="Verkäufe pro Filiale")
         fig_store_pie = px.pie(df_store, names="Filialnummer", values="sales", 
                                title="Verkäufe pro Filiale (Anteile)")
+        
+    # --- Verkäufe pro Artikel ---
+    df_article = pd.DataFrame(rows_article)
+    if df_article.empty:
+        fig_article = px.bar(title="Verkäufe pro Artikel")
+        fig_article.add_annotation(
+            text="Keine Daten vorhanden", xref="paper", yref="paper",
+            x=0.5, y=0.5, showarrow=False, font=dict(size=16)
+        )
+        fig_article.update_xaxes(visible=False)
+        fig_article.update_yaxes(visible=False)
 
-    return fig_cat, fig_cat_pie, fig_time, fig_store, fig_store_pie, kpis
+        fig_article_pie = px.pie(title="Verkäufe pro Artikel")
+        fig_article_pie.add_annotation(
+            text="Keine Daten vorhanden", xref="paper", yref="paper",
+            x=0.5, y=0.5, showarrow=False, font=dict(size=16)
+        )
+    else:
+        df_article = df_article.sort_values("sales", ascending=False)
+
+        fig_article = px.bar(
+            df_article, x="Artikelname", y="sales", title="Verkäufe pro Artikel"
+        )
+        fig_article_pie = px.pie(
+            df_article, names="Artikelname", values="sales", title="Verkäufe pro Artikel (Anteil)"
+        )
+        fig_article_pie.update_traces(textinfo="none",
+                              hovertemplate="%{label}<br>%{percent:.2%} (%{value:.0f})<extra></extra>")
+        fig_article_pie.update_layout(showlegend=False)
+    
+
+    return fig_cat, fig_cat_pie, fig_time, fig_store, fig_store_pie, fig_article, fig_article_pie, kpis
 
 
 if __name__ == "__main__":

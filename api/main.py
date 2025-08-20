@@ -65,7 +65,7 @@ def get_data(
 def metrics(
     start: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
     end: Optional[str]   = Query(None, description="End date (YYYY-MM-DD)"),
-    top: int             = Query(10, ge=1, le=100, description="Top N Kategorien"),
+    top: int             = Query(10, ge=0, le=100, description="Top N Kategorien"),
 ):
     data = df.copy()
     if start:
@@ -83,8 +83,9 @@ def metrics(
         .sum()
         .reset_index()
         .sort_values("_sales", ascending=False)
-        .head(top)
     )
+    if top > 0:
+        by_cat = by_cat.head(top)
 
     # Verkäufe über Zeit (pro Tag)
     by_date = (
@@ -100,8 +101,19 @@ def metrics(
         .sum()
         .reset_index()
         .sort_values("_sales", ascending=False)
-        .head(top)
     )
+    if top > 0:
+        by_store = by_store.head(top)
+
+    # Verkäufe pro Artikel
+    by_article = (
+        data.groupby(ARTICLE_COL)["_sales"]
+        .sum()
+        .reset_index()
+        .sort_values("_sales", ascending=False)
+    )
+    if top > 0:
+        by_article = by_article.head(top)
 
     # KPIs
     total_sales = float(sales_series.sum())
@@ -130,5 +142,9 @@ def metrics(
         "sales_by_store": [
             {STORE_COL: str(row[STORE_COL]), "sales": float(row["_sales"])}
             for _, row in by_store.iterrows()
+        ],
+        "sales_by_article": [
+            {ARTICLE_COL: str(row[ARTICLE_COL]), "sales": float(row["_sales"])}
+            for _, row in by_article.iterrows()
         ],
     }
