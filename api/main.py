@@ -82,7 +82,7 @@ def metrics(
     - Sales over time
     - Sales by store
     - Sales by article
-    - KPIs (total sales, avg per day, distinct articles)
+    - KPIs (total rows, total sales, avg per day, distinct articles)
     - Predicted sales value over time
     """
 
