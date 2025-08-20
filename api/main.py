@@ -16,7 +16,7 @@ DATE_COL = "Verkaufsdatum"
 CATEGORY_COL = "Kategorie"
 SALES_COL = "Verkauf in Stück"  # falls CSV falsch decodiert ist: "Verkauf in StÃ¼ck"
 STORE_COL = "Filialnummer"
-ARTICLE_COL = "Artikelnummer"   # für distinct_articles
+ARTICLE_COL = "Artikelname"   # für distinct_articles
 
 # Minimaler Fix, falls das "ü" zerschossen ist
 if SALES_COL not in df.columns and "Verkauf in StÃ¼ck" in df.columns:
@@ -109,7 +109,7 @@ def metrics(
     avg_sales_per_day = float(total_sales / days) if days > 0 else 0.0
 
     distinct_articles = (
-        int(data[ARTICLE_COL].nunique())
+        data[ARTICLE_COL].nunique()
         if ARTICLE_COL in data.columns
         else None
     )
@@ -117,8 +117,8 @@ def metrics(
     return {
         "total_rows": int(len(data)),
         "total_sales": total_sales,
-        "avg_sales_per_day": avg_sales_per_day,     # optional für KPI-Leiste
-        "distinct_articles": distinct_articles,     # ← gewünscht
+        "avg_sales_per_day": avg_sales_per_day,    
+        "distinct_articles": distinct_articles,     
         "sales_by_category": [
             {CATEGORY_COL: str(row[CATEGORY_COL]), "sales": float(row["_sales"])}
             for _, row in by_cat.iterrows()
