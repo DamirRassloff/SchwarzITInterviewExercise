@@ -33,7 +33,11 @@ app.layout = html.Div([
             style={"width": "200px"}
         ),
     ], style={"marginBottom": "20px"}),
-    
+
+    # KPI-Leiste (NEU)
+    html.Div(id="kpi-bar", style={"display": "flex", "gap": "16px", "marginBottom": "16px"}),
+
+    # Charts
     dcc.Graph(id="sales-by-category"),
     dcc.Graph(id="sales-over-time"),
     dcc.Graph(id="sales-by-store"),
@@ -55,6 +59,7 @@ def reset_dates(n_clicks):
     Output("sales-by-category", "figure"),
     Output("sales-over-time", "figure"),
     Output("sales-by-store", "figure"),
+    Output("kpi-bar", "children"),  # NEU
     Input("date-range", "start_date"),
     Input("date-range", "end_date"),
     Input("top-n", "value"),
@@ -68,11 +73,35 @@ def update_graphs(start_date, end_date, top_n):
         resp = requests.get(f"{API_BASE}/metrics", params=params, timeout=20)
         resp.raise_for_status()
         data = resp.json()
-        rows_cat = data.get("sales_by_category", [])
-        rows_time = data.get("sales_over_time", [])
-        rows_store = data.get("sales_by_store", []) 
+        rows_cat   = data.get("sales_by_category", [])
+        rows_time  = data.get("sales_over_time", [])
+        rows_store = data.get("sales_by_store", [])
     except Exception:
-        rows_cat, rows_time = [], []
+        data = {}
+        rows_cat, rows_time, rows_store = [], [], []
+
+    # ---- KPI-Bar (NEU) ----
+    total_sales = data.get("total_sales", 0)
+    total_rows = data.get("total_rows", 0)
+    avg_per_day = data.get("avg_sales_per_day", 0)
+    distinct_articles = data.get("distinct_articles", None)
+
+    def kpi_card(label, value):
+        return html.Div([
+            html.Div(label, style={"fontSize": "12px", "color": "#555"}),
+            html.Div(value, style={"fontSize": "20px", "fontWeight": 700})
+        ], style={"border": "1px solid #eee",
+                  "borderRadius": "10px",
+                  "padding": "10px",
+                  "background": "#fafafa",
+                  "minWidth": "180px"})
+
+    kpis = [
+        kpi_card("Gesamtverkäufe (Stück)", f"{int(total_sales):,}".replace(",", ".")),
+        kpi_card("Datensätze im Zeitraum", f"{int(total_rows):,}".replace(",", ".")),
+        kpi_card("Ø Verkäufe pro Tag", f"{avg_per_day:.2f}"),
+        kpi_card("Anzahl Artikel", f"{int(distinct_articles):,}".replace(",", ".")),
+    ]
 
     # --- Verkäufe pro Kategorie ---
     df_cat = pd.DataFrame(rows_cat)
@@ -118,7 +147,7 @@ def update_graphs(start_date, end_date, top_n):
             df_store = df_store.head(top_n)
         fig_store = px.bar(df_store, x="Filialnummer", y="sales", title="Verkäufe pro Filiale")
 
-    return fig_cat, fig_time, fig_store
+    return fig_cat, fig_time, fig_store, kpis
 
 
 if __name__ == "__main__":

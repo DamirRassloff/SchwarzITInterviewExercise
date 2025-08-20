@@ -16,6 +16,7 @@ DATE_COL = "Verkaufsdatum"
 CATEGORY_COL = "Kategorie"
 SALES_COL = "Verkauf in Stück"  # falls CSV falsch decodiert ist: "Verkauf in StÃ¼ck"
 STORE_COL = "Filialnummer"
+ARTICLE_COL = "Artikelnummer"   # für distinct_articles
 
 # Minimaler Fix, falls das "ü" zerschossen ist
 if SALES_COL not in df.columns and "Verkauf in StÃ¼ck" in df.columns:
@@ -47,7 +48,7 @@ def meta():
 @app.get("/data")
 def get_data(
     start: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
-    end: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
+    end: Optional[str]   = Query(None, description="End date (YYYY-MM-DD)"),
 ):
     data = df.copy()
     if start:
@@ -63,8 +64,8 @@ def get_data(
 @app.get("/metrics")
 def metrics(
     start: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
-    end: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
-    top: int = Query(10, ge=1, le=100, description="Top N Kategorien"),
+    end: Optional[str]   = Query(None, description="End date (YYYY-MM-DD)"),
+    top: int             = Query(10, ge=1, le=100, description="Top N Kategorien"),
 ):
     data = df.copy()
     if start:
@@ -102,9 +103,22 @@ def metrics(
         .head(top)
     )
 
+    # KPIs
+    total_sales = float(sales_series.sum())
+    days = int(len(by_date))
+    avg_sales_per_day = float(total_sales / days) if days > 0 else 0.0
+
+    distinct_articles = (
+        int(data[ARTICLE_COL].nunique())
+        if ARTICLE_COL in data.columns
+        else None
+    )
+
     return {
         "total_rows": int(len(data)),
-        "total_sales": float(sales_series.sum()),
+        "total_sales": total_sales,
+        "avg_sales_per_day": avg_sales_per_day,     # optional für KPI-Leiste
+        "distinct_articles": distinct_articles,     # ← gewünscht
         "sales_by_category": [
             {CATEGORY_COL: str(row[CATEGORY_COL]), "sales": float(row["_sales"])}
             for _, row in by_cat.iterrows()
