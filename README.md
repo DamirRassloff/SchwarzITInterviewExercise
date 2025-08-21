@@ -11,6 +11,7 @@ It demonstrates the use of an API layer for data processing and a separate dashb
   - Serves sales data from CSV  
   - Provides metrics (sales by category, store, article, time)  
   - Includes predicted sales over time  
+  - Includes actual vs predicted sales comparison  
 
 - **Dash frontend** (`/dashboard`):
   - Interactive filtering by date and Top-N  
@@ -21,6 +22,7 @@ It demonstrates the use of an API layer for data processing and a separate dashb
     - Bar & Pie: Sales by Article  
     - Line: Sales over Time  
     - Line: Predicted Sales over Time  
+    - Line: Actual vs Predicted Sales over Time  
 
 ---
 

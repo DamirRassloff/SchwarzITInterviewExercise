@@ -84,6 +84,7 @@ def metrics(
     - Sales by article
     - KPIs (total rows, total sales, avg per day, distinct articles)
     - Predicted sales value over time
+    - Actual vs Predicted over time (comparison)
     """
 
     # Apply date filters
@@ -155,6 +156,14 @@ def metrics(
             .sort_values(DATE_COL)
     )
 
+    # --- Actual vs Predicted over time (daily comparison) ---
+    # Merge the two time series on date; fill gaps with 0 to avoid NaNs in the response.
+    cmp = (
+        by_date.merge(by_date_pred, on=DATE_COL, how="outer")
+               .fillna(0)
+               .sort_values(DATE_COL)
+    )
+
     # Build and return JSON response
     return {
         "total_rows": int(len(data)),
@@ -180,5 +189,13 @@ def metrics(
         "predicted_over_time": [
             {DATE_COL: str(row[DATE_COL].date()), "predicted": float(row["_pred"])}
             for _, row in by_date_pred.iterrows()
+        ],
+        "actual_vs_predicted_over_time": [
+            {
+                DATE_COL: str(row[DATE_COL].date()) if hasattr(row[DATE_COL], "date") else str(row[DATE_COL]),
+                "actual": float(row.get("_sales", 0.0)),
+                "predicted": float(row.get("_pred", 0.0)),
+            }
+            for _, row in cmp.iterrows()
         ],
     }

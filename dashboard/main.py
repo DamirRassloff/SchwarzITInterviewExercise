@@ -46,6 +46,7 @@ app.layout = html.Div([
     dcc.Graph(id="sales-by-article"),
     dcc.Graph(id="sales-by-article-pie"),
     dcc.Graph(id="predicted-over-time"),
+    dcc.Graph(id="actual-vs-predicted"),
 ])
 
 # --- Reset callback for date filter ---
@@ -70,6 +71,7 @@ def reset_dates(n_clicks):
     Output("sales-by-article-pie", "figure"),
     Output("kpi-bar", "children"),
     Output("predicted-over-time", "figure"), 
+    Output("actual-vs-predicted", "figure"),
     Input("date-range", "start_date"),
     Input("date-range", "end_date"),
     Input("top-n", "value"),
@@ -92,6 +94,7 @@ def update_graphs(start_date, end_date, top_n):
         rows_store = data.get("sales_by_store", [])
         rows_article = data.get("sales_by_article", [])
         rows_pred = data.get("predicted_over_time", [])
+        rows_cmp = data.get("actual_vs_predicted_over_time", [])
     except Exception:
         data = {}
         rows_cat, rows_time, rows_store = [], [], []
@@ -204,8 +207,22 @@ def update_graphs(start_date, end_date, top_n):
     else:
         fig_pred = px.line(df_pred, x="Verkaufsdatum", y="predicted",
                            title="Vorhergesagter Verkaufswert über Zeit")
+        
+    # --- Comparison: Actual vs. predicted over time ---
+    df_cmp = pd.DataFrame(rows_cmp)
+    if df_cmp.empty:
+        fig_cmp = px.line(title="Ist vs. Prognose über Zeit")
+        fig_cmp.add_annotation(text="Keine Daten vorhanden",
+                            xref="paper", yref="paper", x=0.5, y=0.5,
+                            showarrow=False, font=dict(size=16))
+        fig_cmp.update_xaxes(visible=False); fig_cmp.update_yaxes(visible=False)
+    else:
+        fig_cmp = px.line(
+            df_cmp, x="Verkaufsdatum", y=["actual", "predicted"],
+            title="Ist vs. Prognose über Zeit"
+        )
 
-    return fig_cat, fig_cat_pie, fig_time, fig_store, fig_store_pie, fig_article, fig_article_pie, kpis, fig_pred
+    return fig_cat, fig_cat_pie, fig_time, fig_store, fig_store_pie, fig_article, fig_article_pie, kpis, fig_pred, fig_cmp
 
 
 if __name__ == "__main__":
